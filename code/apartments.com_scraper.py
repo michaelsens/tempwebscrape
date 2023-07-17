@@ -10,6 +10,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import NoSuchElementException
+
 
 df = pd.DataFrame()
 def find_links(driver, city):
@@ -17,11 +19,12 @@ def find_links(driver, city):
     driver.get(f"https://apartments.com/{city}")
     print(type(driver))
     maxpg = int(driver.find_element(By.CLASS_NAME, "pageRange").text.split(" ")[-1])
-    for pg in range(1, maxpg):
+    for pg in range(1, maxpg + 1):
         driver.get(f"https://apartments.com/{city}/{pg}")
         elements = driver.find_elements(By.CLASS_NAME, "property-link")
-        links.extend(list(set([element.get_attribute('href') for element in elements])))
-    return links
+        for element in elements:
+            links.append(element.get_attribute('href'))
+    return list(set(links))
 
 def add_listings(driver, links):
     global df
@@ -29,12 +32,11 @@ def add_listings(driver, links):
         driver.get(link)
         try:
             units_tab = driver.find_element(By.XPATH, "//*[@data-tab-content-id='all']")
-            units = get_units(units_tab)
-            if units.size == 0:
-                units = get_house(driver)
+            units = get_units(driver, units_tab)
             df = pd.concat([df, units])
-        except:
-            pass
+        except NoSuchElementException:
+            units = get_house(driver, driver)
+            df = pd.concat([df, units])
 
 def get_house(driver):
     house_dict = {
@@ -64,10 +66,10 @@ def get_house(driver):
         house_dict['address'].append(addr)
         house_dict['price'].append(price)
     except:
-        pass
+        print(f'ERROR {driver.current_url}')
     return pd.DataFrame(house_dict)
 
-def get_units(units_tab):
+def get_units(units_tab, driver):
     units_dict = {
         'num_beds': [],
         'num_baths': [],
@@ -78,6 +80,7 @@ def get_units(units_tab):
     try:
         floor_plans = units_tab.find_elements(By.CLASS_NAME, "hasUnitGrid")
     except:
+        print(f'ERROR {driver.current_url}')
         return pd.DataFrame(units_dict)
     for floor_plan in floor_plans:
         try:
@@ -97,9 +100,9 @@ def get_units(units_tab):
                     units_dict['address'].append(unit_num)
                     units_dict['price'].append(price)
                 except:
-                    pass
+                    print(f'ERROR {driver.current_url}')
         except:
-            pass
+            print(f'ERROR {driver.current_url}')
 
     return pd.DataFrame(units_dict)
 
@@ -114,15 +117,6 @@ def main(city='richmond-va'):
     # options.add_argument('--headless') #removed for debug
 
     driver = webdriver.Chrome(service=service, options=options)
-    #
-    # driver.get("https://www.apartments.com/ink-at-scotts-collection-richmond-va/j7w4xz5/")
-    #
-    # units_tab = driver.find_element(By.XPATH, "//*[@data-tab-content-id='all']")
-    # units = get_units(units_tab)
-    # print(units)
-    #
-    # driver.get("https://www.apartments.com/2400-perry-st-richmond-va/4xhy6vl/")
-    # get_house(driver)
 
     aptlinks = find_links(driver, city)
     print(aptlinks) #debug
