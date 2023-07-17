@@ -35,7 +35,7 @@ def add_listings(driver, links):
             units = get_units(driver, units_tab)
             df = pd.concat([df, units])
         except NoSuchElementException:
-            units = get_house(driver, driver)
+            units = get_house(driver)
             df = pd.concat([df, units])
 
 def get_house(driver):
